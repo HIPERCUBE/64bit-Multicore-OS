@@ -1,11 +1,11 @@
-## 개발환경 구축
+## 2장 개발환경 구축
 
 ### 크로스 컴파일러 만들기
 이 책에서는 window 기반으로 작성되어있다.
-[맥용 크로스 컴파잉러]()는 util/CrossCompiler에 있으니 이걸 이용해서 컴파일 하면 된다.
+맥용 크로스 컴파일러는 [util/CrossCompiler](https://github.com/HIPERCUBE/64bit-Multicore-OS/tree/master/util/CrossCompiler)에 있으니 이걸 이용해서 컴파일 하면 된다.
 
 ### NASM 설치
-[NASM]()은 util/nasm-2.11.08에 들어있다.
+NASM은 [util/nasm-2.11.08](https://github.com/HIPERCUBE/64bit-Multicore-OS/tree/master/util/nasm-2.11.08)에 들어있다.
 제대로 작동하는지 확인해보자
 ```
 > nasm -version
