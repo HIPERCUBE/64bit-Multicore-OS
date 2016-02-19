@@ -17,4 +17,8 @@ NASM version 0.98.40 (Apple Computer, Inc. build 11) compiled on Nov 11 2015
 JDK 8, Intellij 15 를 사용해서 진행한다.
 
 ### QEMU 설치
-맥에 QEMU 설치하는 방법이 [여기](https://github.com/psema4/pine/wiki/Installing-QEMU-on-OS-X)에 자세히 나와있다.
+Mac쓰는 개발자라면 당연히 Homebrew가 설치되어있으니 설치과정을 넘어가도록하겠다.
+```
+brew install qemu
+```
+간단하다.
