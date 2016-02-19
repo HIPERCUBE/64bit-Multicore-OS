@@ -2,6 +2,7 @@
 
 ### 크로스 컴파일러 만들기
 이 책에서는 window 기반으로 작성되어있다.
+
 맥용 크로스 컴파일러는 [util/CrossCompiler](https://github.com/HIPERCUBE/64bit-Multicore-OS/tree/master/util/CrossCompiler)에 있으니 이걸 이용해서 컴파일 하면 된다.
 
 ### NASM 설치
