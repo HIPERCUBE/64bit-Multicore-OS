@@ -22,3 +22,9 @@ Mac쓰는 개발자라면 당연히 Homebrew가 설치되어있으니 설치과�
 brew install qemu
 ```
 간단하다.
+
+잘 설치되었는지 확인해보도록 하자.
+```
+> qemu-img --v
+qemu-img version 2.5.0, Copyright (c) 2004-2008 Fabrice Bellard
+```
