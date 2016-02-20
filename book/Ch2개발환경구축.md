@@ -9,7 +9,7 @@
 NASM은 [util/nasm-2.11.08](https://github.com/HIPERCUBE/64bit-Multicore-OS/tree/master/util/nasm-2.11.08)에 들어있다.
 제대로 작동하는지 확인해보자
 ```
-> nasm -version
+> util/nasm-2.11.08/nasm -version
 NASM version 0.98.40 (Apple Computer, Inc. build 11) compiled on Nov 11 2015
 ```
 
