@@ -29,3 +29,6 @@ brew install qemu
 > qemu-img --v
 qemu-img version 2.5.0, Copyright (c) 2004-2008 Fabrice Bellard
 ```
+
+
+다른사람에 맥에서 구동시키는 방법을 정리해놓은 문서가 있어서 첨부 : [OS X 개발환경 구축](http://nayuta.net/64비트_멀티코어_OS_원리와_구조/OS_X에서_개발환경_구축하기)
