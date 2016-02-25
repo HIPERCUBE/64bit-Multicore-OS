@@ -63,3 +63,5 @@ Clion에서 MINT64라는 프로젝트를 생성한다.
 ### MINT64 OS의 디렉터리 구조 생성
 MINT64 OS는 리얼모드, 보호모드, IA-32e모드용 코드를 나눠서 관리한다.
 이러한 파일을 디렉터리 하나로 관리하는 것은 매우 비효율적이므로 디렉터리 구조를 다래 그림과 같이 항목별로 나누었다.
+
+![](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/book/img/Ch4_img2.jpg)
