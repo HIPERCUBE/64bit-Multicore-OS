@@ -9,4 +9,4 @@
  - 1장 시작하기전에
  - [2장 OS 개발환경을 구축하자](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/book/Ch2개발환경구축.md)
  - [3장 64비트 프로세서의 이모저모](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/book/Ch3_64비트%20프로세서의%20이모저모.md)
- - [4장 부팅과 부트로더](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/book/Ch4_부팅과%20부트로더.md)
+ - [4장 내 PC를 부팅하자](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/book/Ch4_내%20PC를%20부팅하자.md)
