@@ -72,3 +72,143 @@ MINT64 OS는 리얼모드, 보호모드, IA-32e모드용 코드를 나눠서 관
 
 아래 이미지는 Clion project explorer 화면이다.
 이렇게 디렉터리를 설정해주면 된다.
+
+![](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/book/img/Ch4_img3.png)
+
+이제 빌드할때 필요한 make 파일을 작성해보도록 하겠다.
+
+### makefile 작성
+make문법의 기본 형식은 다음과 같이 Target, Dependency, Command 세 부분으로 구성되어 있다.
+
+``` make
+Target: Dependency ...
+  Command
+  Command
+  ...
+```
+
+Target은 일반적으로 생성할 파일을 나타내며, 특정 라벨(Label)을 지정하여 해당 라벨과 관련된 부분만 빌드하는것도 가능하다.
+
+Dependency는 Target 생성에 필요한 소스파일이나 오브젝트파일등을 나타낸다.
+
+Command는 Dependency에 관련된 파일이 수정되면 실행할 명령을 의미한다.
+Command에는 명령창이나 terminal에서 실행할 명령 또는 프로그램을 기술한다.
+Command앞에 빈 공간은 TAB이다. 반드시 TAB으로 작성해야한다. 그렇지 않으면 make가 정상적으로 실행되지 않을수 있다.
+
+예제를 통해 살펴보도록하자.
+아래 예제는 a.c와 b.c 파일을 gcc로 빌드하여 output를 생성하는 makefile 예제이다.
+다음과 같이 makefile을 생성한 뒤에 명령창이나 터미널에서 make를 입력하면 간단히 빌드할 수 있다.
+
+``` make
+# a.c, b.c를 통해서 output 파일을 생성하는 예제
+
+all: output
+
+a.o: a.c
+    gcc -c a.c
+
+b.o: b.c
+    gcc -c b.c
+
+output: a.o, b.o
+    gcc -o output a.o b.o
+```
+
+가장 윗부분에 all이라고 표기한 특별한 Target이 있다.
+all은 make를 실행하면서 옵션으로 Target을 직접 명시하지 않았을때 기본적으로 사용하는 Target이다.
+여러 Target을 빌드할때 all Target의 오른쪽에 순서대로 나열하면 한번에 처리할 수 있다.
+
+make는 빌드를 수행하는 도중에 다른 make를 실행할 수 있다.
+이는 빌드 단계를 세부적으로 나누고, 계층적으로 수행할 수 있음을 의미한다.
+최상위 디렉터리의 하위에 Library 디렉터리가 있고, 빌드 과정에서 Library 디렉터리를 빌드해야한다면 -C 옵션을 사용해서 다음과 같이 간단히 처리할 수 있다.
+
+``` make
+# output을 빌드한다
+all: output
+
+# Library 디렉터리로 이동한 후 make 수행
+libtest.a:
+    make -C Library
+
+output.o: output.c
+    gcc -c output.c
+
+output: libtest.a output.o
+    gcc -o output output.c -ltest -L./
+```
+
+`-ltest -L./`라는 부분이 있다.
+`-l`옵션 다음에 오는건 `libtest.a` 라이브러리 파일이다.
+앞에 `lib`는 빼고 온다. 예를들어 `libm.a`를 링크하고 싶을때는 `-lm`으로 작성한다.
+맨뒤에 `-L./`는 라이브러리 파일의 경로를 나타낸다. 여기서는 현재 디렉토리를 가리킨다.
+
+### MINT64용 makefile 생성
+최상단 디렉토리에 makefile을 만들고 아래처럼 작성한다.
+
+``` make
+all: BootLoader Disk.img
+
+BootLoader:
+    @echo
+    @echo =============== Build Boot Loader ===============
+    @echo
+
+    make -C 00.BootLoader
+
+    @echo
+    @echo =============== Build Complete ===============
+    @echo
+
+Disk.img: 00.BootLoader/BootLoader.bin
+    @echo
+    @echo =============== Disk Image Build Start ===============
+    @echo
+
+    cp 00.BootLoader/BootLoader.bin Disk.img
+
+    @echo
+    @echo =============== All Build Complete ===============
+    @echo
+
+clean:
+    make -C 00.BootLoader clean
+    rm -f Disk.img
+```
+
+최상위 makefile의 목적은 OS 이미지 생성을 위해 각 하위 디렉터리의 makefile을 실행하는 것이다.
+지금은 부트 로더만 있으므로 해당 디렉터리로 이동해서 빌드하고, 빌드한 결과물을 복사하여 OS이미지를 생서하는것이 전부이다.
+
+최상위 디렉터리에 makefile을 생성했으니 다음은 부트로더 디렉터리에 makefile을 생성할 차례이다.
+MINT64 OS의 최사우이 디렉터리에 makefile을 생성하는 것과 같은 방법으로 00.BootLoader디렉터리에 makefile을 생성한다.
+
+``` make
+all: BootLoader.bin
+
+BootLoader.bin: BootLoader.asm
+    nasm -o BootLoader.bin BootLoader.asm
+    
+clean:
+    rm -f BootLoader.bin 
+```
+
+부트로더 makefile의 목적은 BootLoader.asm 파일을 nasm 어셈블리어 컴파일러로 빌드하여 BootLoader.bin 파일을 생성하는 것이다.
+clean Target이 정의되어 잇으며 자신의 디렉터리에 있는 BootLoader.bin 파일을 삭제한다.
+
+최상위 디렉터리의 makefile로 빌드하면 BootLoader.asm파일이 없으므로 아래와 같은 에러가 발생한다.
+
+```
+
+=============== Build Boot Loader ===============
+
+make -C 00.BootLoader
+make[1]: *** No rule to make target `BootLoader.asm', needed by `BootLoader.bin'.  Stop.
+make: *** [BootLoader] Error 2
+```
+
+참고로 이런 에러가 발생할 수 있다.
+```
+makefile:4: *** missing separator.  Stop.
+```
+Command 앞에 tab이 오지 않아서 그런것이다.
+Clion에서 tab으로 입력해도 스페이스 여러개로 입력된것처럼 입력되기도 한다.
+vim같은걸로 수정하는걸 추천한다.
