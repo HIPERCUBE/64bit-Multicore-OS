@@ -58,7 +58,7 @@ PC는 디스크나 플래시 메모리 등 다양한 장치로 부팅할 수 있
 ### 프로젝트 생성
 Clion에서 MINT64라는 프로젝트를 생성한다.
 특별히 설명할 내용은 없으므로 건너 뛰도록 하겠다.
-[MINT64]()보고 따라오면 된다.
+[MINT64](https://github.com/HIPERCUBE/64bit-Multicore-OS/tree/master/MINT64)보고 따라오면 된다.
 
 ### MINT64 OS의 디렉터리 구조 생성
 MINT64 OS는 리얼모드, 보호모드, IA-32e모드용 코드를 나눠서 관리한다.
