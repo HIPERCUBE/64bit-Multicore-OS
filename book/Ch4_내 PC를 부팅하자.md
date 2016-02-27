@@ -249,7 +249,7 @@ vim같은걸로 수정하는걸 추천한다.
 부트로더를 메모리에 정상적으로 복사하려면 한 가지만 지키면 된다.
 부트섹터 512바이트에서 마지막 2바이트를 0x55, 0xAA로 저장하면 된다.
 
-00.BootLoader 디렉터리에 [BootLoader.asm]() 파일을 생성하고 아래와 같이 입력한 후 빌드를 수행한다.
+00.BootLoader 디렉터리에 [BootLoader.asm](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/MINT64/00.BootLoader/BootLoader.asm) 파일을 생성하고 아래와 같이 입력한 후 빌드를 수행한다.
 빌드가 정상적으로 끝나면 MINT64 OS의 최상단 디렉터리에 Disk.img 파일이 생성된다 
 
 ``` asm
