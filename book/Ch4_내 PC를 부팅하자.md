@@ -313,7 +313,7 @@ bat파일을 만들었으니 실행해보자
 참고로 `./qemu-system-x86_64MINT.bat` 명령으로 실행을 못할 수 있다.
 실행권한이 없기때문이다. `chmod 775 qemu-system-x86_64MINT.bat`으로 실행권한을 부여하면된다.
 
-![](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/8e5b994b1783837a8e704ab1495e99dd3d2da048/book/img/Ch4_img4.png)
+![](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/book/img/Ch4_img4.png)
 
 플로피 디스크로 부팅한다는 메시지가 표시되고 멈춘다.
 위에서 만든 부트로더는 무한루프를 돌도록 `jmp $` 명령을 넣어서 Booting from Floppy에서 더이상 진행이 안된다.
@@ -321,4 +321,4 @@ bat파일을 만들었으니 실행해보자
 만약에 이걸 0x00, 0x00으로 다르게 변경하면 어떻게 될까?
 아래 사진처럼 부팅 실패 메시지를 표시하고 멈추게 된다.
 
-![](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/8e5b994b1783837a8e704ab1495e99dd3d2da048/book/img/Ch4_img5.png)
+![](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/book/img/Ch4_img5.png)
