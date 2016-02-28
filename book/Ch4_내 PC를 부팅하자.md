@@ -296,3 +296,17 @@ cp 00.BootLoader/BootLoader.bin Disk.img
 =============== All Build Complete ===============
 ```
 `make` 명령으로 빌드를 하면 Disk.img 파일이 생성될것이다.
+
+
+### QEMU 실행
+빌드한 부트로더는 2장에서 설치한 QEMU를 사용해서 테스트할 수 있으며, QEMU는 가상머신 실행 파일, 옵션과 함께 실행하는 배치파일(.bat)로 구성되어 있다.
+실행할 때마다 옵션을 입력하기는 불편하므로 배치파일로 실행을 자동화하면 편하다.
+
+최상단 디렉토리에 [qemu-system-x86_64MINT.bat](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/MINT64/qemu-system-x86_64MINT.bat)파일을 만들도록 하겠다.
+
+```
+qemu-system-x86_64 -L . -m 64 -fda Disk.img -localtime -M pc
+```
+
+64MB의 메모리를 할당하고 MINT64 OS 이미지 파일을 플로피 디스크로 설정하는 명령어이다.
+bat파일을 만들었으니 실행해보자
