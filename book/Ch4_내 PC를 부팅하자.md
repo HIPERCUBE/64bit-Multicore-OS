@@ -336,9 +336,9 @@ PC부팅 후 기본으로 설정되는 화면 모드는 텍스트 모드로 화�
 전경색과 배경색의 최상위 비트를 모두 강조 기능으로 사용하면 16가지 색상을 표현할 수 있으므로 이를 이용하면 그럴듯한 텍스트 화면을 표시할 수 있다.
 아래 사진은 이러한 텍스트 모드의 화면구조이며, 밑에 표는 전경색과 배경색의 값과 의미를 정리한 것이다.
 
-![](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/book/img/Ch4_img6.png)
+![](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/book/img/Ch4_img6.jpg)
 
-![](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/book/img/Ch4_img7.png)
+![](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/book/img/Ch4_img7.jpg)
 
 이제 화면에 문자를 표시하려면 0xB8000 어드레스에 문자와 속성을 순서대로 지정하면 된다는 것을 알았다.
 이를 이용해서 화면 맨 위에 M을 빨간색 배경에 밝은 녹색으로 출력해 보겠다.
@@ -397,7 +397,7 @@ db 0xAA             ; 1바이트를 선언하고 값은 0xAA
 
 빌드한 후 실행해보면 아래처럼 맨 첫칸에 빨간 바탕해 녹색으로된 'M' 문자를 볼 수 있다.
 
-![](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/book/img/Ch4_img8.png)
+![](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/book/img/Ch4_img8.jpg)
 
 
 ### 세그먼트 레지스터 초기화
