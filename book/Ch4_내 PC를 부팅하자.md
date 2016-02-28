@@ -2,7 +2,7 @@
 
 ## 부팅과 부트로더
 모든 OS들은 512바이트 크기의 작은 코드에서 시작한다.
-512바이트의 작은 코드는 **부트로더(Boot loader)라고 불리며, OS의 나머지 코드를 메모리에 복사해 실행한다.
+512바이트의 작은 코드는 **부트로더(Boot loader)**라고 불리며, OS의 나머지 코드를 메모리에 복사해 실행한다.
 
 ### 부팅과 BIOS
 **부팅(Booting)**은 PC가 켜진 후에 OS가 실행되기 전까지 수행되는 일련의 작업과정을 의미한다.
@@ -455,6 +455,140 @@ while (1) {
         break;
 }
 ```
+
 위 C언어 소스를 세그먼트 레지스터 접두사를 사용하는 어셈블리어로 변경해보겠다.
 C언어 소스코드와 어셈블리어 소스 코드를 라인 단위로 구분해서 비교하면 어셈블리어와 C언어가 크게 다르지 않음을 알게 된다.
 변경한 어셈블리어 코드는 아래와 같다
+
+``` asm
+    mov     si, 0                   ; SI 레지스터문자열 원본 인덱스 레지스터)를 초기화
+
+.SCREENCLEARLOOP:                   ; 화면을 지우는 루프
+    mov byte [ es: si ], 0          ; 비디오 메모리의 문자가 위치하는 어드레스에 0을 복사하여 문자를 삭제
+    mov byte [ es: si + 1 ], 0x0A   ; 비디오 메모리의 속성이 위치하는 어드레스에 0x0A를 복사
+    add si, 2                       ; 문자와 속성을 설정했으므로 다음 위치로 이동
+
+    cmp si, 80 * 25 * 2             ; 화면 전체 크기는 80문자 * 25라인이다
+                                    ; 출력한 문자의 수를 의미하는 SI 레지스터와 비교
+    jl  .SCREENCLEARLOOP            ; SI 레지스터가 80 * 25 * 2보다 작다면 아직 지우지 못한 영역이 있으므로 .SCREENCLEARLOOP 레이블로 이동
+                                    ; jl은 Jump if less의 줄임말이다.
+```
+
+![](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/book/img/Ch4_img9.png)
+
+화면을 정리했으니 메시지를 출력해 보도록하자.
+C언어로 먼저구현한후 어셈블리어로 변경하겠다.
+
+``` C
+int i = 0;
+int j = 0;
+char *pcVideoMemory = (char *) 0xB800;
+char *pcMessage = "MINT64 OS Boot Loader Start~!!";
+char cTemp;
+
+while (1) {
+    cTemp = pcMessage[i];
+    
+    if (cTemp == 0)
+      break;
+    
+    pcVideoMemory[j] = cTemp;
+    i += 1;
+    j += 2;
+}
+```
+
+``` asm
+mov si, 0                       ; SI 레지스터(문자열 원본 인덱스 레지스터)를 초기화 
+    mov di, 0                       ; DI 레지스터(문자열 대상 인덱스 레지스터)를 초기화
+    
+.MESSAGELOOP:                       ; 메세지 출력하는 루프
+    mov cl, byte [ si + MESSAGE1 ]  ; MESSAGE1의 어드레스에서 SI 레지스터 값만큼 더한 위치의 문자를 CL 레지스터에 복사
+                                    ; CL 레지스터는 CX 레지스터의 하위 1바이트를 의미
+                                    ; 문자열은 1바이트면 충분하므로 CX 레지스터의 하위 1바이트만 사용
+    cmp cl, 0                   ; 복사도니 문자와 0을 비교
+    je  .MESSAGEEND             ; 복사한 문자의 값이 0이면 문자열이 종료되었음을 의미하므로 .MESSAGEEND로 이동하여 문자 출력 종료
+                                ; je는 Jump if equal의 줄임말이다
+    
+    mov byte [ es: di ], cl     ; 0이 아니면 비디오 메모리 어드레스 0xB800:di에 문자를 출력
+    
+    add si, 1                   ; SI 레지스터에 1을 더하여 다음 문자열로 이동
+    add di, 2                   ; DI 레지스터에 2를 더하여 비디오 메모리의 다음 문자 위치로 이동
+                                ; 비디오 메모리는 문자, 속성의 쌍으로 구성되므로 문자만 출력하려면 2를 더해야한다.
+                                
+    jmp .MESSAGELOOP            ; 메시지 출력 루프로 이동하여 다음 문자 출력
+.MESSAGEEND:
+
+MESSAGE1:   db 'MINT64 OS Boot Loader Start~!!', 0  ; 출력할 메시지 정의
+                                                    ; 마지막은 0으로 설정하여 .MESSAGELOOP에서 처리할 수 있게 함
+```
+
+전체 소스는 첨부
+``` asm
+[ORG 0x00]          ; 코드의 시작 어드레스를 0x00으로 설정
+[BITS 16]           ; 아래 코드를 16비트 코드로 설정
+
+SECTION .text       ; text 섹션(세그먼트) 정의
+
+jmp 0x07C0:START    ; CS 세그먼트 레지스터에 0x07C0을 복사하면서 START 레이블로 이동
+
+START:
+    mov ax, 0x07C0  ; 부트로더의 시작 어드레스(0x07C0)를 세그먼트 레지스터 값으로 변환
+    mov ds, ax      ; DS 세그먼트 레지스터에 설정
+    mov ax, 0xB800  ; 비디오 메모리의 시작 어드레스(0xB800)를 세그먼트 레지스터 값으로 변환
+    mov es, ax      ; ES 레지스터에 설정
+
+    mov     si, 0                   ; SI 레지스터문자열 원본 인덱스 레지스터)를 초기화
+
+.SCREENCLEARLOOP:                   ; 화면을 지우는 루프
+    mov byte [ es: si ], 0          ; 비디오 메모리의 문자가 위치하는 어드레스에 0을 복사하여 문자를 삭제
+    mov byte [ es: si + 1 ], 0x0A   ; 비디오 메모리의 속성이 위치하는 어드레스에 0x0A를 복사
+    add si, 2                       ; 문자와 속성을 설정했으므로 다음 위치로 이동
+
+    cmp si, 80 * 25 * 2             ; 화면 전체 크기는 80문자 * 25라인이다
+                                    ; 출력한 문자의 수를 의미하는 SI 레지스터와 비교
+    jl  .SCREENCLEARLOOP            ; SI 레지스터가 80 * 25 * 2보다 작다면 아직 지우지 못한 영역이 있으므로 .SCREENCLEARLOOP 레이블로 이동
+                                    ; jl은 Jump if less의 줄임말이다.
+
+    mov si, 0                       ; SI 레지스터(문자열 원본 인덱스 레지스터)를 초기화
+    mov di, 0                       ; DI 레지스터(문자열 대상 인덱스 레지스터)를 초기화
+
+.MESSAGELOOP:                       ; 메세지 출력하는 루프
+    mov cl, byte [ si + MESSAGE1 ]  ; MESSAGE1의 어드레스에서 SI 레지스터 값만큼 더한 위치의 문자를 CL 레지스터에 복사
+                                    ; CL 레지스터는 CX 레지스터의 하위 1바이트를 의미
+                                    ; 문자열은 1바이트면 충분하므로 CX 레지스터의 하위 1바이트만 사용
+    cmp cl, 0                   ; 복사도니 문자와 0을 비교
+    je  .MESSAGEEND             ; 복사한 문자의 값이 0이면 문자열이 종료되었음을 의미하므로 .MESSAGEEND로 이동하여 문자 출력 종료
+                                ; je는 Jump if equal의 줄임말이다
+
+    mov byte [ es: di ], cl     ; 0이 아니면 비디오 메모리 어드레스 0xB800:di에 문자를 출력
+
+    add si, 1                   ; SI 레지스터에 1을 더하여 다음 문자열로 이동
+    add di, 2                   ; DI 레지스터에 2를 더하여 비디오 메모리의 다음 문자 위치로 이동
+                                ; 비디오 메모리는 문자, 속성의 쌍으로 구성되므로 문자만 출력하려면 2를 더해야한다.
+
+    jmp .MESSAGELOOP            ; 메시지 출력 루프로 이동하여 다음 문자 출력
+.MESSAGEEND:
+
+MESSAGE1:   db 'MINT64 OS Boot Loader Start~!!', 0  ; 출력할 메시지 정의
+                                                    ; 마지막은 0으로 설정하여 .MESSAGELOOP에서 처리할 수 있게 함
+
+
+jmp $               ; 현재 위치에서 무한 루프 실행
+
+times 510 - ( $ - $$ )  db  0x00    ; $: 현재 라인의 어드레스
+                                    ; $$: 현재 섹션(.text)의 시작 어드레스
+                                    ; $ - $$: 현재 섹션을 기준으로 하는 오프셋
+                                    ; 510 - ( $ - $$ ): 현재부터 어드레스 510까지
+                                    ; db 0x00: 1바이트를 선언하고 값은 0x00
+                                    ; time: 반복 수행
+                                    ; 현재 위치에서 어드레스 510까지 0x00으로 채움
+
+db 0x55             ; 1바이트를 선언하고 값은 0x55
+db 0xAA             ; 1바이트를 선언하고 값은 0xAA
+                    ; 어드레스 511, 512에 0x55, 0xAA를 써서 부트 섹터로 표기함
+```
+
+실행하면 아래처럼 나온다
+
+![](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/book/img/Ch4_img10.png)
