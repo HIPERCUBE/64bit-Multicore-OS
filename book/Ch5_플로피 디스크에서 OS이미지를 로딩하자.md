@@ -952,3 +952,11 @@ cat 00.BootLoader/BootLoader.bin 01.Kernel32/VirtualOS.bin  > Disk.img
 =============== All Build Complete ===============
 
 ```
+
+실행하면 이런 화면을 볼 수 있다.
+
+![](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/book/img/Ch5_img8.png)
+
+다음장인 6장에서는 OS의 핵심 역할을 하는 커널에 대하 공부할것이다.
+커널이 추가되면 지금까지의 리얼모드에서 벗어나서 32비트 보호모드, 64비트의 IA-32e모드로 전환하고 멀티태스킹 같은 고급 기능이 추가되기 때문에 차츰 OS의 모습을 갖추게 된다.
+6장에서는 첫 단계인 보호모드로 전환하는 과정을 공부할 것이다.
