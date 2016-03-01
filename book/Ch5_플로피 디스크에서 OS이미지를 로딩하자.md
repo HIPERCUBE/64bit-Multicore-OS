@@ -812,38 +812,38 @@ START:
     mov ds, ax                  ; AX 레지스터의 값을 DS 세그먼트 레지스터에 설정
     mov ax, 0xB800              ; 비디오 메모리 어드레스인 0x0B8000을 세그먼트 레지스터 값으로 변환
     mov es, ax                  ; ES 세그먼트 레지스터에 설정
-    
-    
+
+
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ; 각 섹터  별로 코드를 생성
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     %assign i 0                 ; i라는 변수를 지정하고 0으로 초기화
     %rep TOTALSECTORCOUNT       ; TOTALSECTORCOUNT에 저장된 값 만큼 아래 코드를 반복
         $assign i i + 1         ; i를 1증가
-        
+
         ; 현재 실행 중인 코드가 포함된 섹터의 위치를 화면 좌표로 변환
-        mov ax, 2                   ; 한 문자를 나타내는 바이트 수(2)를 AX 레지스터에 설정 
+        mov ax, 2                   ; 한 문자를 나타내는 바이트 수(2)를 AX 레지스터에 설정
         mul word [ SECTORCOUNT ]    ; AX 레지스터와 섹터 수를 곱함
         mov si, ax                  ; 곱한 결과를 SI 레지스터에 설정
-        
+
         ; 계산된 결과를 비디오 메모리에 오프셋으로 삼아 세 번째 라인부터 화면에 0을 출력
         mov byte [ es: si + ( 160 * 2 ) ], '0' + ( i % 10 )
         add word [ SECTORCOUNT ], 1             ; 섹터 수를 1 증가
-        
-        ; 마지막 섹터이면 더 수행할 섹터가 없으므로 무한 루프 실행 그렇지 않으면 다음 섹터로 이동해서 코드 수행 
+
+        ; 마지막 섹터이면 더 수행할 섹터가 없으므로 무한 루프 실행 그렇지 않으면 다음 섹터로 이동해서 코드 수행
         %if i == TOTALSECTORCOUNT       ; i가 TOTALSECTORCOUNT와 같다면(마지막 섹터라면)
             jmp $                       ; 현재위치에서 무한 루프 수행
-        %else 
+        %else
             jmp  ( 0x1000 + i * 0x20 ): 0x0000  ; 다음 섹터 오프셋으로 이동
         %endif                          ; if 문의 끝
-        
-        times 512 - ( $ - $$ )  db  0x00    ; $: 현재 라인의 어드레스
-                                            ; $$: 현재 섹션(.text)의 시작 어드레스
-                                            ; $ - $$: 현재 섹션을 기준으로 하는 오프셋
-                                            ; 510 - ( $ - $$ ): 현재부터 어드레스 512까지
-                                            ; db 0x00: 1바이트를 선언하고 값은 0x00
-                                            ; time: 반복 수행
-                                            ; 현재 위치에서 어드레스 512까지 0x00으로 채움
+
+        times ( 512 - ( $ - $$ ) % 512 )  db  0x00  ; $: 현재 라인의 어드레스
+                                                    ; $$: 현재 섹션(.text)의 시작 어드레스
+                                                    ; $ - $$: 현재 섹션을 기준으로 하는 오프셋
+                                                    ; 512 - ( $ - $$ ): %512 현재부터 어드레스 512까지
+                                                    ; db 0x00: 1바이트를 선언하고 값은 0x00
+                                                    ; time: 반복 수행
+                                                    ; 현재 위치에서 어드레스 512까지 0x00으로 채움
     %endrep     ; 반복문의 끝
 ```
 
@@ -860,4 +860,86 @@ VirtualOS.bin: VirtualOS.asm
 
 clean:
 	rm -f VirtualOS.bin
+```
+
+### OS 이미지 통합과 QEMU 실행
+가상 OS 이미지까지 준비되었으므로, 이제 파일들을 하나로 합쳐서 부팅 이미지를 만드는 작업만 남았다.
+부팅 이미지를 만드는 작업은 최상위 디렉터리에 있는 makefile이 담당하고 있다.
+최상위 디렉터리의 makefile은 4장에서 이미 생성했으므로, 가상 OS에 관련된 부분만 추가하여 테스틀하겠다.
+우선 부트 로더와 같은 방법으로 01.Kernel 디렉터리에서 make를 수행하여 가상 OS 이미지를 빌드한다.
+그리고 부트 이미지를 복사해서 부티 ㅇ이미지를 만드는 기존 방식을 수정하여 부트로더와 가상 OS 이미지를 하나의 파일로 합치도록 수정한다.
+두 파일을 하나로 합치려면 파일을 내용을 표시하는 cat 프로그램을 사용하면된다.
+cat을 사용하면 `cat A B C > D`와 같으 ㄴ방식으로 A, B, C파일을 하나로 합쳐 D 파일로 만들 수 있다.
+아래 코드는 수정한 makefile이다.
+all 레이블에 `BootLoader Kernel32 Disk.img`를 ㅣㅇㅂ력해서 부트로더 -> 가상 OS 이미지 -> 부팅 이미지 순서로 진행한다.
+
+``` makefile
+all: BootLoader Kernel32 Disk.img
+
+BootLoader:
+	@echo
+	@echo =============== Build Boot Loader ===============
+	@echo
+
+	make -C 00.BootLoader
+
+	@echo
+	@echo =============== Build Complete ===============
+	@echo
+
+Kernel32:
+	@echo
+	@echo =============== Build 32bit Kernel ===============
+	@echo
+
+	make -C 01.Kernel32
+
+	@echo
+	@echo =============== Build Complete ===============
+	@echo
+
+Disk.img: BootLoader Kernel32
+	@echo
+	@echo =============== Disk Image Build Start ===============
+	@echo
+
+	cat 00.BootLoader/BootLoader.bin 01.Kernel32/VirtualOS.bin  > Disk.img
+
+	@echo
+	@echo =============== All Build Complete ===============
+	@echo
+
+clean:
+	make -C 00.BootLoader clean
+	make -C 01.Kernel32 clean
+	rm -f Disk.img
+```
+
+그러면 `make`명령으로 빌드해보자
+
+```
+> make
+
+=============== Build Boot Loader ===============
+
+make -C 00.BootLoader
+make[1]: Nothing to be done for `all'.
+
+=============== Build Complete ===============
+
+
+=============== Build 32bit Kernel ===============
+
+make -C 01.Kernel32
+make[1]: Nothing to be done for `all'.
+
+=============== Build Complete ===============
+
+
+=============== Disk Image Build Start ===============
+
+cat 00.BootLoader/BootLoader.bin 01.Kernel32/VirtualOS.bin  > Disk.img
+
+=============== All Build Complete ===============
+
 ```
