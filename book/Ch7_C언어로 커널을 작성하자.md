@@ -685,3 +685,153 @@ objcopy는 옵션이 굉장히 많지만 섹션을 추출하여 바이너리로 
 ```
 > ./64bit-Multicore-OS/util/CrossCompiler/bin/x86_64-pc-linux-objcopy -j .text -j .data -j .rodata -j .bss -S binary Kernel32.elf Kernel32.bin
 ```
+
+
+## C 소스 파일 추가와 보호 모드 엔트리 포인트 통합
+
+### C 소스 파일 추가
+C 커널의 엔트리 포인트가 될 Main.c 소스 파일을 생성하기에 앞서, 여러 소스 파일에서 공통으로 사용할 헤더 파일부터 생서하겠다.
+이 헤더 파일은 보호 모드 커널 전반에 걸쳐 사용할 것으로, 기본 데이터 타입과 자료구조를 정의하는데 사용한다.
+헤더 파일 생성을 위해 01.Kernel32 하위에있는 Source 디렉터리에 [Types.h](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/MINT64/01.Kernel32/Source/Types.h)파일을 만들고 아래와 같이 입력한다.
+
+``` C
+#ifndef __TYPES_H__
+#define __TYPES_H__
+
+
+#define BYTE    unsigned char
+#define WORD    unsigned short
+#define DWORD   unsigned int
+#define QWORD   unsigned long
+#define BOOL    unsigned char
+
+#define TRUE    1
+#define FALSE   0
+#define NULL    0
+
+
+#pragma pack(push, 1)
+
+
+// 비디오 모드 중 텍스트 모드 화면을 구성하는 자료구조
+typedef struct kCharactorStruct {
+    BYTE bCharactor;
+    BYTE bAttribute;
+} CHARACTER;
+
+#pragma pack(pop)
+#endif /* __TYPES_H__ */
+```
+
+**CHARACTER**타입은 텍스트 모드 화면을 구성하는 문자 하나를 나타내는 구조체로 텍스트 모드용 비디오 메모리(0xB8000)에 문자를 편하게 출력할 목적으로 추가했다.
+`#pragma pack`은 구조체의 크기정렬(Size Align)에 관련된 지시어(Directive)로 구조체의 크기를 1바이트로 정렬하여 추가적인 메모리 공간을 더 할당하지 않게 한다.
+
+공용 헤더 파일을 추가했으니, C 코드 엔트리 포인트 파일을 생성할 차례이다.
+마찬기지로 01.Kernel의 Source 디렉터리에 [Main.c](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/MINT64/01.Kernel32/Source/Main.c)파일을 추가하고, 아래와 같이 입력한다.
+
+``` C
+#include "Types.h"
+
+void kPrintString(int iX, int iY, const char *pcString);
+
+/**
+ * Main 함수
+ */
+void Main() {
+    kPrintString(0, 3, "C Language Kernel Started~!!");
+
+    while (1);
+}
+
+/**
+ * 문자열 출력 함수
+ */
+void kPrintString(int iX, int iY, const char *pcString) {
+    CHARACTER *pstScreen = (CHARACTER *) 0xB8000;
+
+    pstScreen += (iY * 80) + iX;
+    for (int i = 0; pcString[i] != 0; i++) {
+        pstScreen[i].bCharactor = pcString[i];
+    }
+}
+```
+
+`Main()` 함수는 C코드의 엔트리 포인트 함수로써 0x10200 어드레스에 위치하며, 6장에서 작성한 보호 모드 엔트리 포인트코드에서 최초로 실행되는 코드이다.
+코드를 보혐 `Main()` 함수를 가장 앞쪽으로 위치시켜, 컴파일 시에 코드 섹션의 가장 앞쪽에 위치하게 한 것을 알 수 있다.
+`Main()`함수의 내부는 `kPrintString()`함수를 사용해서 메시지를 표시하고 무한 루프를 수행하게 작성되었다.
+
+### 보호 모드 엔트리 포인트 코드 수정
+6장에서 작성한 보호 모드 커널의 엔트리 포인트 코드 [EntryPoint.s](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/MINT64/01.Kernel32/Source/EntryPoint.s)는 화면에 보호 모드로 전환했다는 메시지를 출력하고 나서 무한 루프를 수행하도록 작성했다.
+이제는 보호 모드 엔트리 포인트 이후에 C 커널 코드가 있으므로 무한 루프를 수행하는 코드를 수정하여 0x10200으로 이동하게끔 변경하겠다.
+C 커널 코드로 이동하게 수정하는 일은 아주 간단하다.
+리얼 모드에서 보호 모드로 전환할때처럼 CS세그먼트 셀렉터와 이동할 선형 주소를 jmp 명령에 같이 지정해주면 된다.
+아래는 C커널 코드로 이동하기 위해 수정한 코드이다.
+
+``` asm
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 보호 모드로 진입
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+[BITS 32]           ; 이하의 코드는 32비트 코드로 설정
+PROTECTEDMODE:
+    mov ax, 0x10    ; 보호 모드 커널용 데이터 세그먼트 디스크립터를 AX 레지스터에 저장
+    mov ds, ax      ; DS 세그먼트 셀렉터에 설정
+    mov es, ax      ; ES 세그먼트 셀렉터에 설정
+    mov fs, ax      ; FS 세그먼트 셀렉터에 설정
+    mov gs, ax      ; GS 세그먼트 셀렉터에 설정
+
+    ; 스택을 0x00000000 ~ 0x0000FFFF 영역에 64KB 크기로 생성
+    mov ss, ax      ; SS 세그먼트 셀렉터에 설정
+    mov esp, 0xFFFE ; ESP 레지스터의 어드레스를 0xFFFE로 설정
+    mov ebp, 0xFFFE ; EBP 레지스터의 어드레스를 0xFFFE로 설정
+
+    ; 화면에 보호 모드로 전환되었다는 메세지 보여주기
+    push ( SWITCHSUCCESSMESSAGE - $$ + 0x10000 )    ; 출력할 메시지의 어드레스를 스택에 삽입
+    push 2              ; 화면 Y 좌표 2를 스택에 삽입
+    push 0              ; 화면 X 좌표 0를 스택에 삽입
+    call PRINTMESSAGE   ; PRINTMESSAGE 함수 호출
+    add esp, 12         ; 삽입한 파라미터 제거
+	
+    ; 수정할 부분
+    jmp dword 0x08: 0x10200 ; C언어 커널이 존재하는 0x10200 어드레스로 이동하여 C언어 커널 수행
+
+```
+
+### makefile 수정
+다수의 파일을 컴파일하고 링크해야하므로 makefile이 좀 더 편리하게 수정할 필요가 있다.
+따라서 make의 몇 가지 유용한 기능을 사용하여 Source 디렉터리에 .c 확장자의 파일만 추가하면 자동으로 포함하여 빌드하게 수정할 것이다.
+
+.c 파일을 자동으로 빌드 목록에 추가려면, 매번 빌드 때마다 Source 디렉터리에 있는 *.c파일을 검색하여 소스 파일 목록에 추가해야한다.
+make에서 이러한 작업을 위해 디렉터리에 있는 파일을 검색하는 와일드 카드 기능을 제공한다.
+Source 디렉터리에 있는 *.c 파일을 모두 검색해서 CSOURCEFILES이라는 변수에 넣고 싶다면 와잉ㄹ드 카드를 사용하여 다음과 같이 입력한다.
+
+``` makefile
+CSOURCEFILES = $(wildcard Source/*.c)
+```
+
+디렉터리에 있는 모든 C파일을 검색했으니, 이제 이 파일들에 대한 빌드 룰만 정해주면 자동으로 빌드할 수 있다.
+지금까지의 makefile은 각 파일에 대해 빌드 룰을 개별적으로 기술했다.
+하지만 빌드에 필요한 파일이 수백개쯤 된다면 관리하기 힘들것이다.
+또한 파일이 추가되고 삭제될때마다 룰을 변경해야하는데 실수하면 오류나 실행 도중 예기치 못한 오류가 발생할 수 있다.
+
+이런한 문제는 파일 패턴에 대해 동일한 룰을 적용함으로써, 간단히 처리할 수 잇다.
+가령 모든 .c 파일은 `gcc -c`라는 컴파일 과정을 통해 .o 파일로 변환된다면, 다음과 같이 써서 모든 .c 파일을 .o파일로 컴파일 할 수 있다.
+
+``` makefile
+%.o : %.c
+	gcc -c $<
+```
+
+와일드 카드와 패턴 룰 기능을 이용하면 Source 디렉터리 내의 모든 C파일을 자동으로 컴파일 할 수 있다.
+그럼 이제 검색된 C파일을 이용하여 링크할 파일 목록을 생성해 보도록 하겠다.
+일반적으로 오브젝트 파일은 소스 파일과 같은 이름이며 확장자만 .o로 변경되므로 소스 파일 목록에 포함된 파일의 확장자를 .c에서 .o로 수정하면 된다.
+특정 문자를 치환하려면 patsubst 기능을 사용하면 되고, patsubst는 `$(patsubst 수정할 패턴, 교체할 패넡, 입력 문자열)` 의 형식으로 사용한다.
+CSOURCEFILES의 내용에서 확장자 .c를 .o로 수정하고 싶다면 다음과 같이 사용하면 된다.
+
+``` makefile
+COBJECTFILES = $(patsubst %.c, %.o, $(CSOURCEFILES))
+```
+
+이게 끝이 아니다.
+우리는 C 커널 엔트리 포인트 함수를 가장 앞쪽에 배치하려면 엔트리 포인트 파일을 COBJECTFILES의 맨 앞에 둬야 한다.
+만일 C 커널의 엔틜 포인트를 포함하는 오브젝트 파일 이름이 Main.o 라고 가정한다면, Main.o 파일을 COBJECTFILES에서 맨 앞에 두려면 다음과 같이 subst를 사용한다.
+
