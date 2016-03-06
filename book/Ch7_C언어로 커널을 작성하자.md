@@ -835,3 +835,141 @@ COBJECTFILES = $(patsubst %.c, %.o, $(CSOURCEFILES))
 우리는 C 커널 엔트리 포인트 함수를 가장 앞쪽에 배치하려면 엔트리 포인트 파일을 COBJECTFILES의 맨 앞에 둬야 한다.
 만일 C 커널의 엔틜 포인트를 포함하는 오브젝트 파일 이름이 Main.o 라고 가정한다면, Main.o 파일을 COBJECTFILES에서 맨 앞에 두려면 다음과 같이 subst를 사용한다.
 
+``` makefile
+CENTRYPOINTOBJECTFILE = Main.o
+COBJECTFILES = $(patsubst %.c, %.o, $(CSOURCEFILES))
+COTHEROBJECTFILES = $(subst Main.o, , $(COBJECTFILES))
+
+Kernel32.elf: $(CENTRYPOINTOBJECTFILE) $(COBJECTFILES)
+	./../util/CrossCompiler/bin/x86_64-pc-linux-ld -o $@ $^
+```
+
+**x86_64-pc-linux-ld** 프로그램이 [util/CrossCompiler/bin](https://github.com/HIPERCUBE/64bit-Multicore-OS/tree/master/util/CrossCompiler/bin)안에 들어있어서 이렇게 설정했다.
+
+이와 같은 규칙은 어셈블리어 파일에도 마찬가지로 적용할 수 있다.
+보호 모드 커널과 IA-32e 모드 커널에서 사용할 어셈블리어 파일은 .asm으로 생성할 예정이므로 이를 고려하여 수정하겠다.
+앞에서 설명한 makefile의 내용 중에서 크게 바뀌는 부분은 없으며, .c부분만 .asm으로 수정하고 GCC 컴파일러 옵션 대신 NASM을 사용하게 변경하면 끝이다.
+단, 컴파일된 어셈블리어 오브젝트파일과 C언어 파일은 같이 링크되어야 하므로 이를 고려하여 컴파일 옵션을 설정해야한다.
+GCC의 오브젝트 파일은 ELF32 파일 포맷 형태를 따르므로 NASM의 오브젝트 파일 역시 동일한 포맷으로 생성되게 컴파일 옵션에 `-f elf32`를 추가한다.
+어셈블리어 빌드 규칙이 적용된 예는 밑에 나오는 예제를 참고하면 된다.
+
+디렉터리에 있는 모든 C 소스 파일을 포함하는 작업은 make의 기능을 사용해서 간단히 처리할 수 있다.
+하지만, 이것은 어디까지나 C 소스 파일에만 해당되는 내용이다.
+C언어는 헤더 파일을 정의하여 소스 파일에서 공통으로 사용하는 데이터 타입이나 함수의 선언을 모아두고, 이를 참조할 수 있다.
+이는 소스 파일의 내용뿐 아니라 헤더 파일이 수정되어도 소스 파일을 다시 빌드해야 함을 의미한다.
+이를 위해서는 소스파일을 모두 검사하여 포함하는 헤더 파일일을 모두 makefile의 Dependency에 기록해야한다.
+
+그렇다면 어떻게 해야 소스 파일에 관련된 헤더 파일을 찾을 수 있을까?
+간단한 프로그램을 작성해서 소스파일의 `#include`부분을 읽어서 처리해야 할까?
+다행히 GCC의 옵션 중에 makefile용 규칙을 만들어 주는 전처리기 관련 옵션(-M 옵션)을 사용하면, 자동으로 헤더 파일을 추출할 수 있다. 그중에서 `-MM` 옵션을 사용하면`stdio.h`와 같은 시스템 헤더 파일을 제외한 나머지 헤더 파일에 대한 의존 관계를 출력할 수 있다.
+따라서 `-MM` 옵션을 이용하여 소스 코드를 모두 검사하고 그 결과를 파일로 저장하면, 소스 파일별 헤더 파일의 의존 관계(Dependency)를 확인할 수 있다.
+다음은 Main.c와 Test.c 소스파일의 의존관계를 구해 Dependency.dep 파일로 저장하는 예이다.
+
+```
+> ./64bit-Multicore-OS/util/CrossCompiler/bin/x86_64-pc-linux-gcc -MM Main.c Test.c > Dependency.dep
+```
+
+이렇게 생성한 Dependency.dep 파일을 makefile에 포함해야 각 파일의 의존 관계를 분석하여 정확한 빌드를 수행할 수 있다.
+make는 수행 시 다른 makefile 포함하는 기능을 제공하며, include 지시어가 바로 그러한 역할을 담당한다.
+무조건 `include Dependency.dep`를 수행하면 안된다.
+include 지시어는 해당 파일이 없으면 에러를 발생시킨다.
+따라서 최초 빌드시나 오브젝트 파일을 정리하고 나서 다시 빌드할때 Dependency.dep 파일이 없으면 빌드 에러가 발생한다.
+이를 피하기위해 현재 디렉터리를 검사해서 파일이 있을때만 포함해야한다.
+이러한 작업은 make의 조건문과 wildcard  함수를 조합하면 된다.
+아래 makefile 예제를 보자
+
+``` makefile
+ifeq (Dependency.dep, $(wildcard Dependency.dep))
+include Dependency.dep
+endif
+```
+
+MINT64 OS의 커널 디렉터리는 소스 디렉터리(Source)와 임시 디렉터리(Temp)로 다시 구분되며, 커널 빌드 작업은 임시 디렉터리를 기준으로 수행한다.
+따라서 Dependancy.dep 파일의 내용과 경로를 같게 하려면 make르 수행하는 디렉터리를 변경하는 옵션 `-C`를 이용하여 임시 디렉터리로 변경한 후 makefile을 수행한다.
+최종 결과물인 보호 모드 커널 이미지는 컴파일과 링크 과정이 끝난 후에 보호 모드 엔트리 포인트와 바이너리로 변환된 C 커널을 결합하여 생성한다.
+아래에서 새로 작성한 01.Kernel32 디렉터리의 makefile을 보자
+
+``` makefile
+##############################################################
+# 빌드 환경 및 규칙 설정
+##############################################################
+# 컴파일러 및 링커 정의
+NASM32 = nasm
+GCC32 = ../../util/CrossCompiler/bin/x86_64-pc-linux-gcc -c -m32 -ffreestanding
+LD32 = ../../util/CrossCompiler/bin/x86_64-pc-linux-ld -melf_i386 -T ../elf_i386.x -nostdlib -e Main -Ttext 0x10200
+OBJCOPY32 = ../../util/CrossCompiler/bin/x86_64-pc-linux-objcopy -j .text -j .data -j .rodata -j .bss -S -O binary
+
+# 디렉터리 정의
+OBJECTDIRECTORY = Temp
+SOURCEDIRECTORY = Source
+
+
+##############################################################
+# 빌드 항목 및 빌드 방법 설정
+##############################################################
+# 기본적으로 빌드를 수행할 목록
+all: prepare Kernel32.bin
+
+ 오브젝트 파일이 위치할 디렉터리를 생성
+prepare:
+	mkdir -p $(OBJECTDIRECTORY)
+
+# 커널 엔트리 포인트 빌드
+$(OBJECTDIRECTORY)/EntryPoint.bin: $(SOURCEDIRECTORY)/EntryPoint.s
+	$(NASM32) -o $@ $<
+
+# 커널의 C 소스 파일에 대한 의존성 정보 생성
+dep:
+	@echo === Make Dependancy File ===
+	make -C $(OBJECTDIRECTORY) -f ../makefile InternalDependency
+	@echo === Dependency Search Complete ===
+
+# 디렉터리를 오브젝트 파일 디렉터리로 이동해서 의존성 파일 및 실행 파일을 생성
+ExecuteInternalBuild: dep
+	make -C $(OBJECTDIRECTORY) -f ../makefile Kernel32.elf
+
+# 커널 이미지를 바이너리 파일로 변환
+$(OBJECTDIRECTORY)/Kernel32.elf.bin: ExecuteInternalBuild
+	$(OBJCOPY32) $(OBJECTDIRECTORY)/Kernel32.elf $@
+
+# 엔트리 포인트와 커널을 합쳐서 보호 모드 바이너리 생성
+Kernel32.bin: $(OBJECTDIRECTORY)/EntryPoint.bin $(OBJECTDIRECTORY)/Kernel32.elf.bin
+	cat $^ > $@
+
+# 소스 파일을 제외한 나머지 파일 정리
+clean:
+	rm -f *.bin
+	rm -f $(OBJECTDIRECTORY)/*.*
+
+
+##############################################################
+# Make에 의해 다시 호출되는 부분, Temp 디렉터리를 기준으로 수행됨
+##############################################################
+# 빌드할 C 소스 파일 정의, Temp 디렉터리를 기준으로 설정
+CENTRYPOINTOBJECTFILE = Main.o
+CSOURCEFILES = $(wildcard ../$(SOURCEDIRECTORY)/*.c)
+ASSEMBLYSOURCEFILES = $(wildcard ../$(SOURCEDIRECTORY)/*.asm)
+COBJECTFILES = $(subst Main.o, , $(notdir $(patsubst %.c,%.o,$(CSOURCEFILES))))
+ASSEMBLYOBJECTFILES = $(notdir $(patsubst %.asm,%.o,$(ASSEMBLYSOURCEFILES)))
+
+# .c 파일을 .o 파일로 바꾸는 규칙 정의
+%.o: ../$(SOURCEDIRECTORY)/%.c
+	$(GCC32) -c $<
+
+# .asm 파일을 .o 파일로 바꾸는 규칙 정의
+%.o: ../$(SOURCEDIRECTORY)/%.asm
+	$(NASM32) -f elf32 -o $@ $<
+
+# 실제 의존성에 관련된 파일을 생성
+InternalDependency:
+	$(GCC32) -MM $(CSOURCEFILES) > Dependency.dep
+
+# 실제 커널 이미지를 빌드
+Kernel32.elf: $(CENTRYPOINTOBJECTFILE) $(COBJECTFILES) $(ASSEMBLYOBJECTFILES)
+	$(LD32) -o $@ $^
+
+# 현재 디릭토리의 파일 중, dependency 파일이 있으면 make에 포함	
+ifeq (Dependency.dep, $(wildcard Dependency.dep))
+include Dependency.dep
+endif
+```
