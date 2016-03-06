@@ -1083,6 +1083,13 @@ TOTALSECTORCOUNT:   dw  0x02       ; 부트로더를 제외한 MINT64 OS이미�
 아래 소스는 이미지 메이커의 소스 코드이다.
 [Mint64/04.Utility/00.ImageMaker/ImageMaker.c](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/MINT64/04.Utility/00.ImageMaker/ImageMaker.c)파일을 생성해서 아래 코드를 입력한다.
 
+아래 코드를 입력할때 주의해야할 사항이 몇가지 있다.
+이 소스코드는 UNIX 기반의 환경에서 작성되었다.
+윈도우에서는 약간의 소스 변경이 필요하다.
+`#include <sys/uio.h>`는 `#include <io.h>`로 해줘야한다.
+`writev()`, `readv()`함수들은 `write()`, `read()`로 작성해줘야한다.
+기타 수정해야할 부분은 소스코드의 주석을 참고하면 된다.
+
 ``` C
 #include <stdio.h>
 #include <stdlib.h>
@@ -1097,5 +1104,264 @@ TOTALSECTORCOUNT:   dw  0x02       ; 부트로더를 제외한 MINT64 OS이미�
 /**
  * 함수 선언
  */
-int AdjustInSectorSize(int iFd)
+int AdjustInSectorSize(int iFd, int iSourceSize);
+
+void WriteKernelInformation(int iTargetFd, int iKernelSectorCount);
+
+int CopyFile(int iSourceFd, int iTargetFd);
+
+
+/**
+ * Main 함수
+ */
+int main(int argc, char *argv[]) {
+    int iSourceFd;
+    int iTargetFd;
+    int iBootLoaderSize;
+    int iKernel32SectorCount;
+    int iSourceSize;
+
+    // 커맨드 라인 옵션 검사
+    if (argc < 3) {
+        fprintf(stderr, "[ERROR] ImageMaker BootLoader.bin Kernel32.bin\n");
+        exit(-1);
+    }
+
+    // Disk.img 파일 생성
+    // Unix 기반이 아닌 다른 OS(Window)에서는 if문을 아래 주석문으로 변경
+    // if ((iTargetFd = open("Disk.img", O_RDWR | O_CREAT | O_TRUNC | O_BINARY, S_IREAD | S_IWRITE)) == -1) {
+    if ((iTargetFd = open("Disk.img", O_RDWR | O_CREAT | O_TRUNC, S_IREAD | S_IWRITE)) == -1) {
+        fprintf(stderr, "[ERROR] Disk.img open failed.\n");
+        exit(-1);
+    }
+
+
+    /**
+     * 부트 로더 파일을 열어서 모든 내용을 디스크 이미지 파일로 복사
+     */
+    printf("[Info] Copy boot loader to image file\n");
+    // Unix 기반이 아닌 다른 OS(Window)에서는 if문을 아래 주석문으로 변경
+    // if ((iSourceFd = open(argv[1], O_RDONLY | O_BINARY)) == -1) {
+    if ((iSourceFd = open(argv[1], O_RDONLY)) == -1) {
+        fprintf(stderr, "[ERROR] %s open failed\n", argv[1]);
+        exit(-1);
+    }
+
+    iSourceSize = CopyFile(iSourceFd, iTargetFd);
+    // close(iSourceFd);
+
+    // 파일 크기를 섹터 크기인 512바이트로 맞추기 위해 나머지 부분을 0x00으로 채움
+    iBootLoaderSize = AdjustInSectorSize(iTargetFd, iSourceSize);
+    printf("[INFO] %s size = [%d] and sector count = [%d]\n",
+           argv[1], iSourceSize, iBootLoaderSize);
+
+
+    /**
+     * 32비트 커널 파일을 열어서 모든 내용을 디스크 이미지 파일로 복사
+     */
+    printf("[INFO] Copy protected mode kernel to image file\n");
+
+    // Unix 기반이 아닌 다른 OS(Window)에서는 if문을 아래 주석문으로 변경
+    // if ((iSourceFd = open(argv[2], O_RDONLY | O_BINARY)) == -1) {
+    if ((iSourceFd = open(argv[2], O_RDONLY)) == -1) {
+        fprintf(stderr, "[ERROR] %s open failed\n", argv[2]);
+        exit(-1);
+    }
+
+    iSourceSize = CopyFile(iSourceFd, iTargetFd);
+    // close(iSourceFd);
+
+    // 파일 크기를 섹터 크기인 512바이트로 맞추기 위해 나머지 부분을 0x00으로 채움
+    iKernel32SectorCount = AdjustInSectorSize(iTargetFd, iSourceSize);
+    printf("[INFO] %s size = [%d] and sector count = [%d]\n",
+           argv[2], iSourceSize, iKernel32SectorCount);
+
+
+    /**
+     * 디스크 이미지에 커널 정보를 갱신
+     */
+    printf("[INFO] Start to write kernel information\n");
+    // 부트섹터의 5번째 바이트부터 커널에 대한 정보를 넣음
+    WriteKernelInformation(iTargetFd, iKernel32SectorCount);
+    printf("[INFO] Image file create complete\n");
+
+    // close(iTargetFd);
+    return 0;
+}
+
+
+/**
+ * 현재 위치부터 512바이트 배수 위치까지 맞추어 0x00으로 채움
+ */
+int AdjustInSectorSize(int iFd, int iSourceSize) {
+    int i;
+    int iAdjustSizeToSector;
+    char cCh;
+    int iSectorCount;
+
+    iAdjustSizeToSector = iSourceSize % BYTEOFSECTOR;
+    cCh = 0x00;
+
+    if (iAdjustSizeToSector != 0) {
+        iAdjustSizeToSector = 512 - iAdjustSizeToSector;
+        printf("[INFO] File size [%lu] and fill [%u] byte\n", iSourceSize, iAdjustSizeToSector);
+        for (i = 0; i < iAdjustSizeToSector; i++)
+            writev(iFd, &cCh, 1);
+    } else {
+        printf("[INFO] File size is aligned 512 byte\n");
+    };
+
+    // 섹터 수 리턴
+    iSectorCount = (iSourceSize + iAdjustSizeToSector) / BYTEOFSECTOR;
+    return iSectorCount;
+}
+
+
+/**
+ * 부트 로더 커널에 대한 정보를 삽입
+ */
+void WriteKernelInformation(int iTargetFd, int iKernelSectorCount) {
+    unsigned short usData;
+    long lPosition;
+
+    // 파일의 시작에서 5바이트 떨어진 위치가 커널의 총 섹터 수 정보를 나타낸다
+    lPosition = lseek(iTargetFd, 5, SEEK_SET);
+    if (lPosition == -1) {
+        fprintf(stderr, "lseek failed. Return value = %d, errorno = %d, %d\n", lPosition, errno, SEEK_SET);
+        exit(-1);
+    }
+
+    usData = (unsigned short) iKernelSectorCount;
+    writev(iTargetFd, &usData, 2);
+
+    printf("[INFO] Total sector count except boot loader [%d]\n", iKernelSectorCount);
+}
+
+
+/**
+ * 소스 파일(Source FD)의 내용을 목표 파일(Target FD)에 복사하고 그 크기를 리턴함
+ */
+int CopyFile(int iSourceFd, int iTargetFd) {
+    int iSourceFileSize;;
+    int iRead;
+    int iWrite;
+    char vcBuffer[BYTEOFSECTOR];
+
+    iSourceFileSize = 0;
+    while (1) {
+        iRead = readv(iSourceFd, vcBuffer, sizeof(vcBuffer));
+        iWrite = writev(iTargetFd, vcBuffer, iRead);
+
+        if (iRead != iWrite) {
+            fprintf(stderr, "[ERROR] iRead != iWrite.. \n");
+            exit(-1);
+        }
+        iSourceFileSize += iRead;
+
+        if (iRead != sizeof(vcBuffer)) {
+            break;
+        }
+    }
+    return iSourceFileSize;
+}
+```
+
+이미지 메이커 [makefile](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/MINT64/04.Utility/00.ImageMaker/makefile)
+
+``` makefile
+# 기본적으로 빌드를 수행할 목록
+all: ImageMaker
+
+# ImageMaker 빌드
+ImageMaker: ImageMaker.c
+	gcc -o $@ $<
+
+# 소스 파일을 제외한 나머지 파일 정리
+clean:	
+	rm -f ImageMaker
+```
+
+### 커널 이미지 생성과 실행
+이제 생성한 이미지 메이커 프로그램으로 디스크 이미지를 생성할 차례이다.
+지금까지는 cat 프로그램을 사용해서 디스크 이미지를 만들었다.
+이제 이를 대신할 이미지 메이커 프로그램을 만들었으므로, 이미지 메이커 프로그램을 이용해서 makefile을 수정하겠다.
+ImageMaker를 빌드해서 ImageMaker 프로그램 파일을 프로젝트 최상위 디렉터리인 MINT64디렉터리로 복사한 후 해당 디렉터리에 있는 makefile을 아래와 같이 수정한다.
+
+```
+> cd 04.Utility/00.ImageMaker/
+> make
+...
+> cp ImageMaker ../../ImageMaker
+```
+
+기존 makefile의 Disk.img 빌드 부분
+``` makefile
+Disk.img: 00.BootLoader/BootLoader.bin 01.Kernel32/Kernel32.bin
+	@echo
+	@echo =============== Disk Image Build Start ===============
+	@echo
+
+	cat $^ > Disk.img
+
+	@echo
+	@echo =============== All Build Complete ===============
+	@echo
+```
+
+새로 변경된 makefile의 Disk.img 빌드 부분
+``` makefile
+Disk.img: 00.BootLoader/BootLoader.bin 01.Kernel32/Kernel32.bin
+	@echo
+	@echo =============== Disk Image Build Start ===============
+	@echo
+
+	./ImageMaker $^
+
+	@echo
+	@echo =============== All Build Complete ===============
+	@echo
+```
+
+makefile 전체
+
+``` makefile
+all: BootLoader Kernel32 Disk.img
+
+BootLoader:
+	@echo
+	@echo =============== Build Boot Loader ===============
+	@echo
+
+	make -C 00.BootLoader
+
+	@echo
+	@echo =============== Build Complete ===============
+	@echo
+
+Kernel32:
+	@echo
+	@echo =============== Build 32bit Kernel ===============
+	@echo
+
+	make -C 01.Kernel32
+
+	@echo
+	@echo =============== Build Complete ===============
+	@echo
+
+Disk.img: 00.BootLoader/BootLoader.bin 01.Kernel32/Kernel32.bin
+	@echo
+	@echo =============== Disk Image Build Start ===============
+	@echo
+
+	./ImageMaker $^
+
+	@echo
+	@echo =============== All Build Complete ===============
+	@echo
+
+clean:
+	make -C 00.BootLoader clean
+	make -C 01.Kernel32 clean
+	rm -f Disk.img
 ```
