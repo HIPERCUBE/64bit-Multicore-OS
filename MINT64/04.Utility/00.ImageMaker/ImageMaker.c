@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <sys/uio.h>    // Mac에서는 sys/uio.h 타 플렛폼에서는 io.h일 수도 있음
+#include <unistd.h>     // Unix 기반에서만 include
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
@@ -113,7 +114,7 @@ int AdjustInSectorSize(int iFd, int iSourceSize) {
         iAdjustSizeToSector = 512 - iAdjustSizeToSector;
         printf("[INFO] File size [%lu] and fill [%u] byte\n", iSourceSize, iAdjustSizeToSector);
         for (i = 0; i < iAdjustSizeToSector; i++)
-            writev(iFd, &cCh, 1);
+            write(iFd, &cCh, 1);
     } else {
         printf("[INFO] File size is aligned 512 byte\n");
     };
@@ -139,7 +140,7 @@ void WriteKernelInformation(int iTargetFd, int iKernelSectorCount) {
     }
 
     usData = (unsigned short) iKernelSectorCount;
-    writev(iTargetFd, &usData, 2);
+    write(iTargetFd, &usData, 2);
 
     printf("[INFO] Total sector count except boot loader [%d]\n", iKernelSectorCount);
 }
@@ -156,8 +157,8 @@ int CopyFile(int iSourceFd, int iTargetFd) {
 
     iSourceFileSize = 0;
     while (1) {
-        iRead = readv(iSourceFd, vcBuffer, sizeof(vcBuffer));
-        iWrite = writev(iTargetFd, vcBuffer, iRead);
+        iRead = read(iSourceFd, vcBuffer, sizeof(vcBuffer));
+        iWrite = write(iTargetFd, vcBuffer, iRead);
 
         if (iRead != iWrite) {
             fprintf(stderr, "[ERROR] iRead != iWrite.. \n");
