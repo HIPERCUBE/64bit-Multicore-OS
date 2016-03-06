@@ -749,8 +749,9 @@ void Main() {
 void kPrintString(int iX, int iY, const char *pcString) {
     CHARACTER *pstScreen = (CHARACTER *) 0xB8000;
 
+    int i;
     pstScreen += (iY * 80) + iX;
-    for (int i = 0; pcString[i] != 0; i++) {
+    for (i = 0; pcString[i] != 0; i++) {
         pstScreen[i].bCharactor = pcString[i];
     }
 }
@@ -895,8 +896,8 @@ MINT64 OS의 커널 디렉터리는 소스 디렉터리(Source)와 임시 디렉
 ##############################################################
 # 컴파일러 및 링커 정의
 NASM32 = nasm
-GCC32 = ../../util/CrossCompiler/bin/x86_64-pc-linux-gcc -c -m32 -ffreestanding
-LD32 = ../../util/CrossCompiler/bin/x86_64-pc-linux-ld -melf_i386 -T ../elf_i386.x -nostdlib -e Main -Ttext 0x10200
+GCC32 = ../../../util/CrossCompiler/bin/x86_64-pc-linux-gcc -c -m32 -ffreestanding
+LD32 = ../../../util/CrossCompiler/bin/x86_64-pc-linux-ld -melf_i386 -T ../elf_i386.x -nostdlib -e Main -Ttext 0x10200
 OBJCOPY32 = ../../util/CrossCompiler/bin/x86_64-pc-linux-objcopy -j .text -j .data -j .rodata -j .bss -S -O binary
 
 # 디렉터리 정의
@@ -910,7 +911,7 @@ SOURCEDIRECTORY = Source
 # 기본적으로 빌드를 수행할 목록
 all: prepare Kernel32.bin
 
- 오브젝트 파일이 위치할 디렉터리를 생성
+# 오브젝트 파일이 위치할 디렉터리를 생성
 prepare:
 	mkdir -p $(OBJECTDIRECTORY)
 
@@ -968,8 +969,133 @@ InternalDependency:
 Kernel32.elf: $(CENTRYPOINTOBJECTFILE) $(COBJECTFILES) $(ASSEMBLYOBJECTFILES)
 	$(LD32) -o $@ $^
 
-# 현재 디릭토리의 파일 중, dependency 파일이 있으면 make에 포함	
+# 현재 디릭토리의 파일 중, dependency 파일이 있으면 make에 포함
 ifeq (Dependency.dep, $(wildcard Dependency.dep))
 include Dependency.dep
 endif
+```
+
+
+## 커널 빌드와 실행
+```
+> make clean
+make -C 00.BootLoader clean
+rm -f BootLoader.bin
+make -C 01.Kernel32 clean
+rm -f *.bin
+rm -f Temp/*.*
+rm -f Disk.img
+
+> make
+
+=============== Build Boot Loader ===============
+
+make -C 00.BootLoader
+nasm -o BootLoader.bin BootLoader.asm
+
+=============== Build Complete ===============
+
+
+=============== Build 32bit Kernel ===============
+
+make -C 01.Kernel32
+mkdir -p Temp
+nasm -o Temp/EntryPoint.bin Source/EntryPoint.s
+=== Make Dependancy File ===
+make -C Temp -f ../makefile InternalDependency
+../../../util/CrossCompiler/bin/x86_64-pc-linux-gcc -c -m32 -ffreestanding -MM ../Source/Main.c > Dependency.dep
+=== Dependency Search Complete ===
+make -C Temp -f ../makefile Kernel32.elf
+../../../util/CrossCompiler/bin/x86_64-pc-linux-gcc -c -m32 -ffreestanding -c ../Source/Main.c
+../../../util/CrossCompiler/bin/x86_64-pc-linux-ld -melf_i386 -T ../elf_i386.x -nostdlib -e Main -Ttext 0x10200 -o Kernel32.elf Main.o
+../../util/CrossCompiler/bin/x86_64-pc-linux-objcopy -j .text -j .data -j .rodata -j .bss -S -O binary Temp/Kernel32.elf Temp/Kernel32.elf.bin
+cat Temp/EntryPoint.bin Temp/Kernel32.elf.bin > Kernel32.bin
+
+=============== Build Complete ===============
+
+
+=============== Disk Image Build Start ===============
+
+cat 00.BootLoader/BootLoader.bin 01.Kernel32/Kernel32.bin > Disk.img
+
+=============== All Build Complete ===============
+
+```
+
+빌드 도중에 이런 에러를 만날 수 있다.
+```
+../../../util/CrossCompiler/bin/x86_64-pc-linux-gcc -c -m32 -ffreestanding -MM ../Source/Main.c > Dependency.dep
+dyld: Library not loaded: /usr/local/lib/libcloog-isl.4.dylib
+  Referenced from: /Users/Joowon/Documents/Github/64bit-Multicore-OS/util/CrossCompiler/bin/../libexec/gcc/x86_64-pc-linux/4.9.0/cc1
+  Reason: image not found
+x86_64-pc-linux-gcc: internal compiler error: Trace/BPT trap: 5 (program cc1)
+/bin/sh: line 1: 82144 Abort trap: 6           ../../../util/CrossCompiler/bin/x86_64-pc-linux-gcc -c -m32 -ffreestanding -MM ../Source/Main.c > Dependency.dep
+```
+
+`/usr/local/lib/libcloog-isl.4.dylib` 파일이 없어서 발생하는 문제이다.
+**cloog**를 지웠다가 재설치하면 된다.
+
+```
+> brew rm cloog
+...
+> brew install cloog
+...
+```
+
+또 이런 에러가 발생한다.
+
+```
+../../../util/CrossCompiler/bin/x86_64-pc-linux-gcc -c -m32 -ffreestanding -MM ../Source/Main.c > Dependency.dep
+dyld: Library not loaded: /usr/local/lib/libisl.10.dylib
+  Referenced from: /Users/Joowon/Documents/Github/64bit-Multicore-OS/util/CrossCompiler/bin/../libexec/gcc/x86_64-pc-linux/4.9.0/cc1
+  Reason: image not found
+x86_64-pc-linux-gcc: internal compiler error: Trace/BPT trap: 5 (program cc1)
+/bin/sh: line 1: 84497 Abort trap: 6           ../../../util/CrossCompiler/bin/x86_64-pc-linux-gcc -c -m32 -ffreestanding -MM ../Source/Main.c > Dependency.dep
+```
+
+`/usr/local/lib/` 경로에 가보면 `libisl.15.dylib` 처럼 10이아니라 다른 숫자로 되어 있을 수 있다.
+이것을 10으로 변경해서 빌드하자
+
+힘들게 빌드를 마치고 나면 이렇게 파일이 여러개 생길것이다.
+
+![](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/book/img/Ch7_img4.png)
+![](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/book/img/Ch7_img5.png)
+
+`Kernel32.bin` 파일이 생성되었을 것이다.
+파일의 크기를 확인하면 661 바이트정도의 크기로, 2섹터에 못 미치는 크기임을 알 수 있다.
+6장에서 설명했듯이, 보호 모드 커널이 정상적으로 메모리에 로딩하고 실행하려면 부트로더에 포함된 `TOTALSECTORCOUNT` 값을 변경해야한다.
+따라서 [00.BootLoader/BootLoader.asm](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/MINT64/00.BootLoader/BootLoader.asm)파일을 열어서 `TOTALSECTORCOUNT` 값을 2로 수정해야한다.
+
+``` asm
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; MINT 64 OS에 관련된 환경 설청 값
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+TOTALSECTORCOUNT:   dw  0x02       ; 부트로더를 제외한 MINT64 OS이미지의 크기
+```
+
+`dw 0x01` 일때와 `dw 0x02`일때 각각 빌드해보자
+`dw 0x01`로 빌드해서 qemu로 실행하면 문제가 발생한다.
+
+소스코드를 빌드하는 작업은 작동화하면서 `TOTALSECTORCOUNT`는 수작업으로 수정하고 있으니 완벽한 자동화가 아니다.
+이러한 불편을 없애기 위해 부트로더와 커널 이미지를 통합하여 섹터(512바이트)크기로 정렬하고, 부트로더의 `TOTALSECTORCOUNT`에 커널의 총 섹터 수를 업테이트하는 이미지 메이커(Image Maker) 프로그램을 짜보도록 하겠다.
+이미지 메이커를 사용하면 더이상 부르토더에 값을 변경하지 않아도 되고, 커널 빌드 과정을 더 편리하게 수행가능하다.
+
+아래 소스는 이미지 메이커의 소스 코드이다.
+[Mint64/04.Utility/00.ImageMaker/ImageMaker.c](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/MINT64/04.Utility/00.ImageMaker/ImageMaker.c)파일을 생성해서 아래 코드를 입력한다.
+
+``` C
+#include <stdio.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <sys/uio.h>    // Mac에서는 sys/uio.h 타 플렛폼에서는 io.h일 수도 있음
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <errno.h>
+
+#define BYTEOFSECTOR    512
+
+/**
+ * 함수 선언
+ */
+int AdjustInSectorSize(int iFd)
 ```
