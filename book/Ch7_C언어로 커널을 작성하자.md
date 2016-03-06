@@ -1086,8 +1086,7 @@ TOTALSECTORCOUNT:   dw  0x02       ; 부트로더를 제외한 MINT64 OS이미�
 아래 코드를 입력할때 주의해야할 사항이 몇가지 있다.
 이 소스코드는 UNIX 기반의 환경에서 작성되었다.
 윈도우에서는 약간의 소스 변경이 필요하다.
-`#include <sys/uio.h>`는 `#include <io.h>`로 해줘야한다.
-`writev()`, `readv()`함수들은 `write()`, `read()`로 작성해줘야한다.
+`#include <sys/uio.h>`는 `#include <io.h>`로 해주고, `#include <unistd.h>`는 뺀다.
 기타 수정해야할 부분은 소스코드의 주석을 참고하면 된다.
 
 ``` C
@@ -1309,7 +1308,7 @@ Disk.img: 00.BootLoader/BootLoader.bin 01.Kernel32/Kernel32.bin
 ```
 
 새로 변경된 makefile의 Disk.img 빌드 부분
-``` makefile
+``` makefileㅑ
 Disk.img: 00.BootLoader/BootLoader.bin 01.Kernel32/Kernel32.bin
 	@echo
 	@echo =============== Disk Image Build Start ===============
@@ -1365,3 +1364,55 @@ clean:
 	make -C 01.Kernel32 clean
 	rm -f Disk.img
 ```
+
+이제 빌드하면 된다
+
+```
+> make
+
+=============== Build Boot Loader ===============
+
+make -C 00.BootLoader
+nasm -o BootLoader.bin BootLoader.asm
+
+=============== Build Complete ===============
+
+
+=============== Build 32bit Kernel ===============
+
+make -C 01.Kernel32
+mkdir -p Temp
+nasm -o Temp/EntryPoint.bin Source/EntryPoint.s
+=== Make Dependancy File ===
+make -C Temp -f ../makefile InternalDependency
+../../../util/CrossCompiler/bin/x86_64-pc-linux-gcc -c -m32 -ffreestanding -MM ../Source/Main.c > Dependency.dep
+=== Dependency Search Complete ===
+make -C Temp -f ../makefile Kernel32.elf
+../../../util/CrossCompiler/bin/x86_64-pc-linux-gcc -c -m32 -ffreestanding -c ../Source/Main.c
+../../../util/CrossCompiler/bin/x86_64-pc-linux-ld -melf_i386 -T ../elf_i386.x -nostdlib -e Main -Ttext 0x10200 -o Kernel32.elf Main.o
+../../util/CrossCompiler/bin/x86_64-pc-linux-objcopy -j .text -j .data -j .rodata -j .bss -S -O binary Temp/Kernel32.elf Temp/Kernel32.elf.bin
+cat Temp/EntryPoint.bin Temp/Kernel32.elf.bin > Kernel32.bin
+
+=============== Build Complete ===============
+
+
+=============== Disk Image Build Start ===============
+
+./ImageMaker 00.BootLoader/BootLoader.bin 01.Kernel32/Kernel32.bin
+[Info] Copy boot loader to image file
+[INFO] File size is aligned 512 byte
+[INFO] 00.BootLoader/BootLoader.bin size = [512] and sector count = [1]
+[INFO] Copy protected mode kernel to image file
+[INFO] File size [661] and fill [363] byte
+[INFO] 01.Kernel32/Kernel32.bin size = [661] and sector count = [2]
+[INFO] Start to write kernel information
+[INFO] Total sector count except boot loader [2]
+[INFO] Image file create complete
+
+=============== All Build Complete ===============
+
+```
+
+QEMU로 실행하면 이런 결과가 나온다.
+
+![](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/book/img/Ch7_img6.png)
