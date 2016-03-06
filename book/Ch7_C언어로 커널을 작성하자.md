@@ -1416,3 +1416,5 @@ cat Temp/EntryPoint.bin Temp/Kernel32.elf.bin > Kernel32.bin
 QEMU로 실행하면 이런 결과가 나온다.
 
 ![](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/book/img/Ch7_img6.png)
+
+다음장에서는 IA-32e 모드로 전환하기 위한 준비의 이로한으로 1MB 이상의 상위 메모리에 접근해서, 데이터를 읽고 쓰는 테스트를 해볼것이다.
