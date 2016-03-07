@@ -5,6 +5,9 @@
 
 맥용 크로스 컴파일러는 [util/CrossCompiler](https://github.com/HIPERCUBE/64bit-Multicore-OS/tree/master/util/CrossCompiler)에 있으니 이걸 이용해서 컴파일 하면 된다.
 
+[Chris Ohk](https://github.com/utilForever)님께서 윈도우 [윈도우 개발환경 구축](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/book/Windows.pdf) 방법을 공유해주셨다.
+윈도우 사용자들은 위 문서를 참고해서 개발환경을 구축하면 된다.
+
 ### NASM 설치
 NASM은 [util/nasm-2.11.08](https://github.com/HIPERCUBE/64bit-Multicore-OS/tree/master/util/nasm-2.11.08)에 들어있다.
 제대로 작동하는지 확인해보자
