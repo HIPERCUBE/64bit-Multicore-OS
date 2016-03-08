@@ -127,7 +127,11 @@ BOOL kInitializeKernel64Area() {
 
 ### 빌드와 실행
 앞에서 makefile을 작성했으므로 추가로 작성할 필요가 없다.
-make하고 QEMU를 돌려보면 아래와 같은 결과를 볼 수 있다.
+make하고 QEMU를 돌려보면 아래 스크린샷처럼 성공할수도 있지만 실패할 수도 있다.
+책에서는 QEMU에서는 정상적으로 작동하지만 실제 PC에서는 제대로 작동하지 않는다고 한다.
+
+이 문제의 원인은 PC가 하위 기종에 대한 호환성을 유지하기 위해 어드레스 라인을 비활성화했기 때문이다.
+어드레스 라인에 대한 내용은 뒤에서 설명할 것이다.
 
 ![](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/book/img/Ch8_img2.png)
 
