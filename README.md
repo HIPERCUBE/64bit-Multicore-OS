@@ -13,3 +13,4 @@
  - [5장 플로피 디스크에서 OS이미지를 로딩하자](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/book/Ch5_플로피%20디스크에서%20OS이미지를%20로딩하자.md)
  - [6장 32비트 보호모드로 전환하자](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/book/Ch6_32비트%20보호%20모드로%20전환하자.md)
  - [7장 C언어로 커널을 작성하자](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/book/Ch7_C언어로%20커널을%20작성하자.md)
+ - [8장 A20 게이트를 활성화하여 1MB 이상 영역에 접근해보자](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/book/Ch8_A20%20게이트를%20활성화하여%201MB%20이상%20영역에%20접근해보자.md)
