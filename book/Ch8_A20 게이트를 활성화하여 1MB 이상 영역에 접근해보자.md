@@ -211,6 +211,17 @@ BIOS의 시스템 서비스에 A20 게이트 관련 기능이 들어있다.
 아래는 BIOS 서비스를 호출하여 A20 게이트를 활성화하는 코드이다.
 
 ``` asm
+mov ax, 0x2401      ; A20 게이트 활성화 서비스 설정
+int 0x15            ; BIOS 인터럽트 서비스 호출
+
+jc .A20GATEERROR    ; A20 게이트 활성화가 성공했는지 확인
+jmp .A20GATESUCCESS
+
+.A20GATEERROR:
+    ; 에러 핸들링
+
+.A20GATESUCCESS:
+    ; 성공 처리
 ```
 
 ## A20 게이트 적용과 메모리 크기 검사
