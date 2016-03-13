@@ -424,3 +424,23 @@ BOOL kIsMemoryEnough() {
     return TRUE;
 }
 ```
+
+### 빌드 및 실행
+[qemu-system-x86_64MINT.bat](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/MINT64/qemu-system-x86_64MINT.bat) 파일을 수정해야한다.
+메모리를 64MB보다 작은 32로 변경해서 테스트 해보자.
+
+``` bat
+qemu-system-x86_64 -L . -m 32 -fda Disk.img -localtime -M pc
+```
+
+메모리가 32로 설정되었기때문에 아래 사진처럼 실패한다.
+
+![](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/book/img/Ch8_img6.png)
+
+bat 파일을 다시 복구하고 다시 실행하면 성공한다.
+
+``` bat
+qemu-system-x86_64 -L . -m 64 -fda Disk.img -localtime -M pc
+```
+
+![](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/book/img/Ch8_img7.png)
