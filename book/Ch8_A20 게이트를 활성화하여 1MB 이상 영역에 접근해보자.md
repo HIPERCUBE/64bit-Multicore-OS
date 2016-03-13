@@ -295,3 +295,132 @@ START:
 PROTECTEDMODE:
  ; ~ 생략 ~
 ```
+
+빌드 후 실행하면 아래와 같은 화면이 나온다.
+
+![](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/book/img/Ch8_img2.png)
+
+1MB 이상의 메모리에 접근할 수 있게 되었다.
+4GB의 메모리를 자유롭게 사용할 수 있다.
+앞으로 이공간을 여러 구역으로 나누어 멀티태스킹, 파일 시스템, 동적 메모리 관리, 애플리케이션 메모리 등이 용도로 사용 가능하다.
+
+그전에 먼저 메모리 총량을 검사하는 기능을 구현해야한다.
+보호 모드에서는 최대 4GB메모리까지 밖에 접근이 불가능하므로 4GB 이상의 메모리를 정확하게 판단하기 위해 IA-32e 모드 커널에서 검사를 해야한다.
+메모리 전체 크기 계산은 IA-32e커널에서 하고, 여기서는 MINT64 OS 실행에 필요한 메모리가 충분한지 검사하도록 하겠다.
+
+### 메모리 크기 검사 기능 추가
+사용가능한 메모리를 검사하는 방법 : 메모리에 특정 값을 쓰고 다시 읽어서 같은 값이 나오는지 확인
+ > 진짜 물리 메모리일 경우 : 쓴 값이 그대로 읽힌다.<br/>
+ > 아닌 경우 : 쓴 값은 저장되지 않았으므로 임의의 값이 읽히게 된다.<br/>
+
+1MB 단위로 어드레스를 증가시키면서 각 MB의 첫 번째 4바이트에 0x12345678를 쓰고 읽어 보는 방식으로 구현한다.
+
+[01.Kernel32/Source/Main.c](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/MINT64/01.Kernel32/Source/Main.c)
+
+``` C
+#include "Types.h"
+
+/**
+ * 함수 선언
+ */
+void kPrintString(int iX, int iY, const char *pcString);
+
+BOOL kInitializeKernel64Area();
+
+BOOL kIsMemoryEnough();
+
+
+/**
+ * Main 함수
+ */
+void Main() {
+    DWORD i;
+
+    kPrintString(0, 3, "C Language Kernel Started...................[Pass]");
+
+    // 최소 메모리 크기를 만족하는지 검사
+    kPrintString(0, 4, "Minimum Memory Size Check...................[    ]");
+    if (kIsMemoryEnough() == FALSE) {
+        kPrintString(45, 4, "Fail");
+        kPrintString(0, 5, "Not Enough Memory~!! MINT64 OS Requires Over 64Mbyte Memory~!!");
+        while (1);
+    } else {
+        kPrintString(45, 4, "Pass");
+    }
+
+    // IA-32e 모드의 커널 영역을 초기화
+    kPrintString(0, 5, "IA-32e Kernel Area Initialize...............[    ]");
+    if (kInitializeKernel64Area() == FALSE) {
+        kPrintString(45, 5, "Fail");
+        kPrintString(0, 6, "Kernel Area Initialization Fail~!!");
+        while (1);
+    }
+    kPrintString(45, 5, "Pass");
+
+    while (1);
+}
+
+/**
+ * 문자열 출력 함수
+ */
+void kPrintString(int iX, int iY, const char *pcString) {
+    CHARACTER *pstScreen = (CHARACTER *) 0xB8000;
+
+    int i;
+    pstScreen += (iY * 80) + iX;
+    for (i = 0; pcString[i] != 0; i++) {
+        pstScreen[i].bCharactor = pcString[i];
+    }
+}
+
+/**
+ * IA-32e 모드용 커널 영역을 0으로 초기화
+ */
+BOOL kInitializeKernel64Area() {
+    DWORD *pdwCurrentAddress;
+
+    // 초기화를 시작할 어드레스인 0x100000(1MB)을 설정
+    pdwCurrentAddress = (DWORD *) 0x100000;
+
+    // 마지막 어드레스인 0x600000(6MB)까지 루프를 돌면서 4바이트씩 0으로 채움
+    while ((DWORD) pdwCurrentAddress < 0x600000) {
+        *pdwCurrentAddress = 0x00;
+
+        // 0으로 저장한 후 다시 읽었을 때 0이 나오지 않으면 해당 어드레스를
+        // 사용하는데 문제가 생긴 것이므로 더이상 진행하지 않고 종료
+        if (*pdwCurrentAddress != 0)
+            return FALSE;
+
+        // 다음 어드레스로 이동
+        pdwCurrentAddress++;
+    }
+
+    // 작업을 맞친후 정상적으로 완료되었다고 TRUE 반환
+    return TRUE;
+}
+
+/**
+ * MINT64 OS를 실행하기에 충분한 메모리를 가지고 있는지 체크
+ */
+BOOL kIsMemoryEnough() {
+    DWORD *pdwCurrentAddress;
+
+    // 0x100000(1MB)부터 검사 시작
+    pdwCurrentAddress = (DWORD *) 0x100000;
+
+    // 0x4000000(64MB)까지 루프를 돌면서 확인
+    while ((DWORD) pdwCurrentAddress < 0x4000000) {
+        *pdwCurrentAddress = 0x12345678;
+
+        // 0x12345678로 설정한 후 다시 읽었을 때 0x12345678이 나오지 않으면
+        // 해당 어드레스를 사용하는데 문제가 생긴 것이므로 더이상 진행하지 않고 종료
+        if (*pdwCurrentAddress != 0x12345678) {
+            return FALSE;
+        }
+
+        // 1MB씩 이동하면서 확인
+        pdwCurrentAddress += (0x100000 / 4);
+    }
+    return TRUE;
+}
+```
