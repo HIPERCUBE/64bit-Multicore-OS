@@ -444,3 +444,4 @@ qemu-system-x86_64 -L . -m 64 -fda Disk.img -localtime -M pc
 ```
 
 ![](https://github.com/HIPERCUBE/64bit-Multicore-OS/blob/master/book/img/Ch8_img7.png)
+
